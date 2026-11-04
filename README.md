@@ -1,30 +1,27 @@
 # wiki-flow-kit
 
-`wiki-flow-kit` packages the local cross-agent Wiki workflow for macOS. An Agent can install it, create or restore a knowledge workspace, register the shared Skill with Codex, diagnose the setup, sync `aiwiki` into LLM Wiki, and refresh qmd.
+`wiki-flow-kit` 把本地 Wiki 流程打包为可通过 Agent 对话安装和维护的能力，支持 macOS Apple Silicon（M 系列）与 Intel。它将项目规范 `aiwiki`、通用资料 `valut`、LLM Wiki 应用和 qmd 检索连起来，支持导入整理、跨库问答、知识同步和工具更新。
 
 Supported machines are Apple Silicon (`arm64`) and Intel (`x86_64`) Macs. The kit requires native Homebrew under `/opt/homebrew` on Apple Silicon and `/usr/local` on Intel, plus Python 3.12, Node.js 22, qmd 2.8.3, and the open-source LLM Wiki app. It installs an architecture-matched upstream DMG when available. Intel otherwise builds the selected upstream release tag from source using Xcode Command Line Tools, Rust, protobuf, and the included x86_64 PDFium library.
 
-## Agent Setup
+## 让 Agent 安装
 
-After `yayapao/wiki-flow-kit` has its first GitHub Release, give the target Mac Agent this request:
+把下面这段话发给新 Mac 上可以执行本机命令的 Agent：
 
 ```text
-Set up wiki-flow on this Mac using the latest release from yayapao/wiki-flow-kit.
-Download the fixed wiki-flow-kit.zip asset through the GitHub Release API and verify its SHA-256 digest before extracting it. Support this Mac's native Apple Silicon or Intel architecture. Install the kit and LLM Wiki, configure the shared Skill and Codex MCP if Codex is installed, then run wiki-flow doctor.
-Use ~/Documents/wiki-flow as the workspace. If I provide a .wiki-flow.zip migration bundle, verify its manifest and SHA-256 before restoring it. Otherwise run wiki-flow init.
-Do not create compatibility symlinks, upload my knowledge bundle, or put API keys in files. Ask me to enter the model API key in LLM Wiki Settings, then verify the local API, MCP, qmd search, and a small source sync. Report versions, paths, checks, and anything still pending.
+请从 https://github.com/yayapao/wiki-flow-kit 的最新 Release 为这台 Mac 安装 wiki-flow。
+先读取仓库 README，再通过 GitHub Release API 下载 wiki-flow-kit.zip，按 asset digest 校验 SHA-256。解压后运行 packaging/install.sh，使用本机原生 arm64 或 x86_64 架构，工作区设为 ~/Documents/wiki-flow。缺少依赖时处理安装；系统安装窗口或管理员密码由我操作。
+没有迁移包就初始化空知识库；如我另行提供迁移包，先校验清单和文件散列，再恢复到空工作区。打开 LLM Wiki 和 valut 项目，让我在 App 设置里输入模型凭证并启用本地 API。最后运行 doctor，验证 API、MCP、qmd 和少量资料同步，并报告完成项和待完成项。
+不要创建兼容软链，不要上传个人知识包，也不要读取或转移其他客户端的登录凭证。
 ```
+
+[最新版 Release](https://github.com/yayapao/wiki-flow-kit/releases/latest) · [直接下载安装包](https://github.com/yayapao/wiki-flow-kit/releases/latest/download/wiki-flow-kit.zip) · [SHA-256 清单](https://github.com/yayapao/wiki-flow-kit/releases/latest/download/SHA256SUMS.txt)
+
+安装包包含工具和共享 Skill，安装时联网获取依赖及 LLM Wiki 应用。个人知识和模型凭证由各机器分别管理。Intel 在上游缺少原生 DMG 时从 Release tag 本机编译，完整 App 构建仍需 Intel 实机验收。
+
+后续直接说 `$wiki-flow 更新工具`，Agent 会检查 GitHub 最新版并执行更新，保留本机知识与配置。
 
 For a local checkout or extracted kit, run `packaging/install.sh`. It installs prerequisites and uses the architecture-specific LLM Wiki path above. Installation does not import personal knowledge or configure model credentials.
-
-The local kit can already be copied to another Mac without a remote release:
-
-```text
-Install the attached wiki-flow-kit-v0.1.0.zip on this Mac. Verify it against the attached SHA256SUMS.txt, extract it, read wiki-flow/README.md, and run wiki-flow/packaging/install.sh --workspace ~/Documents/wiki-flow.
-Then run ~/.local/bin/wiki-flow init, or restore my migration bundle into the empty workspace. Open LLM Wiki with the valut folder and let me enter the model credentials in its Settings. Finish by running ~/.local/bin/wiki-flow doctor and report checks that remain pending.
-```
-
-The remote repository and first release have not been published yet. Until then, the installer, updater, and release workflow can be tested from this checkout, but a second Mac cannot fetch a release from GitHub.
 
 ## Agent Commands
 
@@ -61,4 +58,4 @@ python3 -m unittest discover -s tests -v
 python3 packaging/build_release.py --output dist
 ```
 
-The release workflow runs these checks on native Apple Silicon and Intel GitHub runners, then publishes a versioned archive, a stable `wiki-flow-kit.zip` download, and a checksum list. `aiwiki/wiki-flow/` remains the canonical home for detailed design and operational facts. The source currently has no configured Git remote or published Release, so remote installation and self-update become available after the repository and first Release are published.
+The release workflow runs these checks on native Apple Silicon and Intel GitHub runners, then publishes a versioned archive, a stable `wiki-flow-kit.zip` download, and a checksum list. Push a `vX.Y.Z` tag matching `VERSION` to publish the next release after both test jobs pass. `aiwiki/wiki-flow/` remains the canonical home for detailed design and operational facts.
