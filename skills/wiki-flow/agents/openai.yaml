@@ -1,0 +1,4 @@
+interface:
+  display_name: "wiki-flow"
+  short_description: "一句话查看 Wiki 状态、导入整理资料、检索问答和维护项目文档，保留来源与更新历史"
+  default_prompt: "使用 $wiki-flow 介绍你自己，告诉我可以直接发起哪些操作。"

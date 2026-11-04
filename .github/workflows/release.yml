@@ -1,0 +1,74 @@
+name: Test and release wiki-flow-kit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate native architecture
+        run: |
+          case "$RUNNER_ARCH" in
+            ARM64) expected=arm64 ;;
+            X64) expected=x86_64 ;;
+            *) echo "Unexpected runner architecture: $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          actual="$(uname -m)"
+          if [[ "$expected" != "$actual" ]]; then
+            echo "Expected $expected runner, got $actual" >&2
+            exit 1
+          fi
+      - name: Run checks
+        run: |
+          bash -n packaging/install.sh
+          python -m py_compile packaging/portable.py bin/wiki-flow
+          python -m unittest discover -s tests -v
+
+  release:
+    name: Publish versioned kit archive
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release version
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version="${RELEASE_TAG#v}"
+          [[ "$(tr -d '\r\n' < VERSION)" == "$version" ]]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Package runtime files
+        run: python3 packaging/build_release.py --output dist
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/wiki-flow-kit-v*.zip dist/wiki-flow-kit.zip dist/SHA256SUMS.txt --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/wiki-flow-kit-v*.zip dist/wiki-flow-kit.zip dist/SHA256SUMS.txt \
+              --title "$RELEASE_TAG" --generate-notes
+          fi
