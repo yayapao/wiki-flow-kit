@@ -304,6 +304,22 @@ class PortableTests(unittest.TestCase):
             refresh.assert_called_once()
             self.assertFalse(json.loads(state.read_text())["refreshPending"])
 
+    def test_sync_refresh_uses_existing_cli_when_installed_entry_is_missing(self):
+        paths = self.paths()
+        portable.make_scaffold(paths)
+        (paths["aiwiki"] / "README.md").write_text("project docs")
+        paths["cli"].parent.mkdir(parents=True)
+        paths["cli"].symlink_to(MODULE_PATH.parents[1] / "bin/wiki-flow")
+        with patch.object(portable, "architecture", return_value="arm64"):
+            portable.write_profile(paths, "/test/python", "/test/node")
+        args = type("Args", (), {"workspace": str(self.workspace), "apply": True})()
+        with patch.object(portable, "api_post", return_value={"available": True}), \
+                patch.object(portable, "run", return_value="refreshed") as refresh, redirect_stdout(io.StringIO()):
+            self.assertEqual(portable.sync_command(args), 0)
+        refresh.assert_called_once_with([portable.sys.executable, str(paths["cli"]), "refresh", "--vectors"], timeout=1800)
+        state = json.loads((paths["valut"] / ".llm-wiki/wiki-flow-sync.json").read_text())
+        self.assertFalse(state["refreshPending"])
+
     def test_launch_agent_uses_installed_manager_and_explicit_registry(self):
         paths = self.paths()
         paths["data"].mkdir(parents=True)
@@ -315,18 +331,31 @@ class PortableTests(unittest.TestCase):
         }))
         manager = paths["data"] / "portable.py"
         manager.write_text("placeholder")
-        with patch.object(portable, "resolve_runtime", return_value="/test/python3"), \
+        with patch.object(portable.sys, "executable", "/test/python3"), \
                 patch.object(portable.subprocess, "run"), patch.object(portable, "run"), redirect_stdout(io.StringIO()):
             self.assertEqual(portable.create_launch_agent(paths), 0)
         plist = self.home / "Library/LaunchAgents/com.wiki-flow.sync.plist"
         value = plistlib.loads(plist.read_bytes())
         self.assertEqual(value["ProgramArguments"], ["/test/python3", str(manager), "sync", "--apply"])
         self.assertEqual(value["EnvironmentVariables"]["WIKI_FLOW_CONFIG"], str(paths["registry"]))
+        self.assertEqual(value["StartCalendarInterval"], {"Hour": 10, "Minute": 0})
         self.assertFalse(value["RunAtLoad"])
         with patch.dict(os.environ, {"WIKI_FLOW_CONFIG": str(paths["registry"])}):
             selected = portable.workspace_paths()
         self.assertEqual(selected["aiwiki"], paths["aiwiki"])
         self.assertEqual(selected["valut"], paths["valut"])
+
+    def test_launch_agent_uses_checkout_manager_when_not_installed(self):
+        paths = self.paths()
+        paths["data"].mkdir(parents=True)
+        with patch.object(portable.sys, "executable", "/test/python3"), \
+                patch.object(portable.subprocess, "run"), patch.object(portable, "run"), redirect_stdout(io.StringIO()):
+            self.assertEqual(portable.create_launch_agent(paths), 0)
+        plist = self.home / "Library/LaunchAgents/com.wiki-flow.sync.plist"
+        value = plistlib.loads(plist.read_bytes())
+        self.assertEqual(value["ProgramArguments"], ["/test/python3", str(MODULE_PATH.resolve()), "sync", "--apply"])
+        self.assertEqual(value["StartCalendarInterval"], {"Hour": 10, "Minute": 0})
+        self.assertFalse(value["RunAtLoad"])
 
     def test_update_checks_do_not_downgrade_newer_local_version(self):
         args = type("Args", (), {"repository": "example/wiki-flow-kit", "apply": True, "workspace": str(self.workspace)})()

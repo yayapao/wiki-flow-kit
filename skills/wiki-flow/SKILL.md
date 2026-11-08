@@ -1,6 +1,6 @@
 ---
 name: wiki-flow
-description: 跨 Agent 本地 Wiki 助手。可安装与诊断 macOS 工作站，迁移知识、同步 aiwiki、更新工具，并处理导入、检索、整理和索引刷新；支持“当前状态”等自然语言操作。
+description: 跨 Agent 本地 Wiki 助手。处理安装诊断、知识迁移、aiwiki 同步、导入整理、检索和索引刷新；用户明确发起 mylife 记录、项目经历访谈、个人思考整理或旁观者评价时，进入事件驱动的个人知识流程。
 ---
 
 # wiki-flow
@@ -15,6 +15,9 @@ description: 跨 Agent 本地 Wiki 助手。可安装与诊断 macOS 工作站�
 | --- | --- |
 | `介绍你自己`、`你能做什么`、`帮助`、仅提及 `$wiki-flow` | 按“介绍”回答，不查询服务、不改文件 |
 | `当前状态`、`status`、`看看知识库情况` | 运行 `status`，按“状态”报告实时数据 |
+| `mylife`、`这段经历值得留下，采访我`、`这个项目不错，聊聊写进 mylife`、`整理我的这个想法` | 读 [mylife 流程](references/mylife.md)；首次进入运行 `mylife interview` 并阅读 Vault 约定，依据用户意图开展事件访谈或协作整理 |
+| `以旁观者看看我`、`mylife 客观评价我的选择` | 读 [mylife 流程](references/mylife.md)，运行 `mylife observe`，按独立旁观者人设基于具体材料观察 |
+| `mylife 当前状态`、`检查 mylife` | 分别运行 `mylife` 或 `check --domain mylife`；只读本地 Vault |
 | `导入 <文件/网址/目录>`、`把 aiwiki 喂给 LLM Wiki`、`收录这篇文章` | 读 [导入与整理](references/ingestion.md)，保存原文后检查应用自动摄入结果，完成回读与刷新；应用未接管或用户明确要求时才由当前模型整理 |
 | `整理已导入资料`、`整理 amg`、`继续整理` | 读 [导入与整理](references/ingestion.md)，先检查现有原文与处理进度，复用快照并完成指定范围 |
 | `查询 <问题>`、`搜索 <关键词>` 或直接提出知识问题 | 检索并阅读证据后回答；默认不写页 |
@@ -30,13 +33,13 @@ description: 跨 Agent 本地 Wiki 助手。可安装与诊断 macOS 工作站�
 | `开启每日同步`、`停止每日同步` | 按明确请求运行 `wiki-flow schedule enable` / `disable` |
 | `更新工具` | 先运行 `wiki-flow update --check`；用户明确要求执行更新时运行 `wiki-flow update --apply`，失败时保留当前安装 |
 
-缺少必需的导入来源、问题或更新目标时，只询问缺失项。`aiwiki`（也含用户常写的 `aikiwi`）对应注册表中的 `aiwikiRoot`；`valut` 对应 `general.path`。在目录中找到唯一对应的项目可直接使用；多个项目无法区分时再澄清。介绍、状态、查询和检查不隐含清理、导入或全库改写。
+缺少必需的导入来源、问题或更新目标时，只询问缺失项。`aiwiki`（也含用户常写的 `aikiwi`）对应注册表中的 `aiwikiRoot`；`valut` 对应 `general.path`；`mylife` 对应 `personal.path`。更具体的 mylife 意图优先于普通知识问答和更新路由。在目录中找到唯一对应的项目可直接使用；多个项目无法区分时再澄清。介绍、状态、查询和检查不隐含清理、导入或全库改写。
 
 ## 介绍
 
-以“我是 wiki-flow，你的跨 Agent 本地 Wiki 助手”开头，简短说明可以在 macOS 上安装/诊断、跨 aiwiki 与 valut 检索、导入整理资料、维护文档、迁移知识和同步索引。给出 4～6 个可直接使用的短例子，至少包含 `$wiki-flow 当前状态`、`$wiki-flow 导入 <网址或文件>`、`$wiki-flow 查询 <问题>`、`$wiki-flow 预览知识同步` 和 `$wiki-flow 更新工具`。
+以“我是 wiki-flow，你的跨 Agent 本地 Wiki 助手”开头，简短说明可以在 macOS 上安装/诊断、跨 aiwiki 与 valut 检索、导入整理资料、维护文档、迁移知识和同步索引，也能通过事件访谈协助沉淀 mylife。给出 6 个可直接使用的短例子：`$wiki-flow 当前状态`、`$wiki-flow 导入 <网址或文件>`、`$wiki-flow 查询 <问题>`、`$wiki-flow 预览知识同步`、`$wiki-flow 更新工具`、`$wiki-flow mylife，这个项目值得留下，采访我`。
 
-说明客户端与应用各自使用配置的模型，LLM Wiki / Obsidian 阅读同一份本地 Markdown；项目事实以 aiwiki 为准。应用自动摄入可用时由应用生成知识页，客户端负责检索、维护及补充整理。使用上游对应架构的签名 DMG；Intel 没有官方 DMG 时从选定 Release tag 在本机编译，需 Xcode Command Line Tools、Rust 和 protobuf。不要在未执行状态检查时声称 API 正常、资料为空或任务已完成。
+说明客户端与应用各自使用配置的模型，LLM Wiki 与 Obsidian 共读 valut 的本地 Markdown，mylife 是 Obsidian 独立管理的个人 Vault；项目事实以 aiwiki 为准。应用自动摄入可用时由应用生成知识页，客户端负责检索、维护及补充整理。使用上游对应架构的签名 DMG；Intel 没有官方 DMG 时从选定 Release tag 在本机编译，需 Xcode Command Line Tools、Rust 和 protobuf。不要在未执行状态检查时声称 API 正常、资料为空或任务已完成。
 
 ## 状态
 
@@ -51,12 +54,15 @@ description: 跨 Agent 本地 Wiki 助手。可安装与诊断 macOS 工作站�
 
 ## 查询
 
+- mylife 内的检索使用 `find --domain mylife <关键词>`、`read --domain mylife <相对路径>`；当前是否纳入 qmd 以注册表为准，不把 `search-all` 的两来源结果当作已搜索个人库。
 - 两来源为注册表中的 valut（通用资料）与 aiwiki（项目规范）。先用 `search-all <关键词>`；需要中文语义召回用 `semantic <问题>`。后者使用 qmd 结构化 vec 查询并关闭重排，不运行本地生成式查询扩展；问题改写由当前会话模型完成。
 - 检索结果只是候选，回答前读相关正文与来源。通用页用 `read <wiki/相对路径>`；项目文档使用 `find/read --domain <域>`，先读 aiwiki 的 `AGENTS.md`、目标域 README 和相关专项规范。遵守项目维护约定；缺失的 ViewAI Wiki 静默跳过。
 - `search` 是 llm_wiki 当前项目内关键词 / 图谱检索。LLM Wiki 没有直接接入 qmd；aiwiki 在 qmd 可检索，不等于已经导入应用。
 - 回答引用真实文件或原始来源，区分项目当前事实、外部建议、推断和待验证项。默认只回答，不为每个问题写新页。
 
 ## 更新
+
+个人经历、思考、想象和自我观察按 [mylife 流程](references/mylife.md) 写入 `--domain mylife`，使用本地文件、基准校验与历史收据；不走通用库 API、自动摄入、index/log 或默认 qmd 刷新。普通项目资料整理不会自动启动个人访谈、生成自我画像或整库回流；由用户明确发起相关意图。
 
 1. 读取 schema、目标原页与来源；`read` 返回正文及 SHA-256。项目事实原位维护在 aiwiki；通用经验进入 valut。已授权任务的确定增量直接处理。
 2. 同一页面串行写入。用 UTF-8 临时文件准备完整正文，运行 `write <相对路径> --file <临时文件> --expected <读取时sha256>`，项目文档加 `--domain <域>`，新页用 `--expected new`。基准变化时重新读、合并，不绕过检查。

@@ -76,7 +76,29 @@ class Flow:
     def domain(self, name):
         if name == 'general':
             return {'root': str(self.root), 'entry': 'purpose.md', 'mode': 'api'}
+        if name == 'mylife':
+            personal = self.config.get('personal', {})
+            if not personal.get('path'):
+                raise ValueError('mylife 尚未登记；在注册表 personal.path 中指定已有 Obsidian Vault')
+            return {'id': 'mylife', 'root': str(Path(personal['path']).expanduser().resolve()), 'entry': personal.get('entry', '首页.md'), 'mode': 'files'}
         return next(d for d in self.config['domains'] if d['id'] == name)
+
+    def mylife(self, role=None):
+        if role not in [None, 'interview', 'observe']:
+            raise ValueError('mylife 支持 interview（采访者）或 observe（旁观者）；省略角色则查看入口')
+        personal = self.config.get('personal', {})
+        result = {'configured': bool(personal.get('path')), 'roles': {'interview': '采访者', 'observe': '旁观者'}, 'generation': '当前会话模型执行人设；CLI 只读取入口与指令，不调用模型或写文件'}
+        if not result['configured']:
+            return result
+        domain = self.domain('mylife')
+        root = Path(domain['root'])
+        entry = safe_path(root, domain['entry'])
+        result.update({'domain': 'mylife', 'root': str(root), 'exists': root.is_dir(), 'entry': str(entry), 'entryExists': entry.is_file(), 'qmdIndexed': 'mylife' in self.config.get('qmd', {}).get('sources', [])})
+        if role:
+            skill = Path(__file__).resolve().parents[1] / 'skills/wiki-flow'
+            persona = skill / 'personas' / ('interviewer.md' if role == 'interview' else 'observer.md')
+            result.update({'role': role, 'persona': str(persona), 'instructions': persona.read_text(), 'workflow': str(skill / 'references/mylife.md'), 'vaultRules': str(root / 'AGENTS.md')})
+        return result
 
     def api(self, method, suffix, body=None, global_path=False, timeout=330):
         state = json.loads(Path(self.config['appState']).read_text())
@@ -154,6 +176,8 @@ class Flow:
         for p in sorted(root.rglob('*.md')):
             if p.is_symlink() or '.git' in p.parts:
                 continue
+            if domain == 'mylife' and (any(part.startswith('.') for part in p.relative_to(root).parts) or p.relative_to(root).parts[0] in ['模板', '附件']):
+                continue
             content = p.read_text(errors='replace')
             if any(t in content.casefold() for t in terms):
                 lines = [f'{i}: {s[:240]}' for i, s in enumerate(content.splitlines(), 1) if any(t in s.casefold() for t in terms)]
@@ -218,6 +242,8 @@ class Flow:
         target = safe_path(root, path)
         if target.suffix != '.md' or (domain == 'general' and (not path.startswith('wiki/') or any(x.startswith('.') for x in Path(path).parts))):
             raise ValueError('只写 Markdown；通用库页面必须位于 wiki/ 下')
+        if domain == 'mylife' and any(part.startswith('.') for part in Path(path).parts):
+            raise ValueError('mylife 不通过页面写入修改隐藏配置目录')
         if domain == 'viewai' and not target.exists():
             return {'skipped': True}
         with self.lock():
@@ -250,7 +276,9 @@ class Flow:
                     receipt['embedding'] = {'ok': False, 'error': str(e), 'retry': 'wiki-flow embed ' + path}
         return receipt
 
-    def check(self):
+    def check(self, domain='general'):
+        if domain == 'mylife':
+            return self.check_mylife()
         pages = list((self.root / 'wiki').rglob('*.md'))
         slugs = {p.stem for p in pages}
         issues = []
@@ -263,10 +291,34 @@ class Flow:
                 issues.append({'path': str(p), 'type': 'missing-origin'})
         return {'pages': len(pages), 'issues': issues, 'scope': '确定性 Wiki 链接与来源入口检查；语义矛盾请在应用审核或 Agent 中处理'}
 
+    def check_mylife(self):
+        root = Path(self.domain('mylife')['root'])
+        if not root.is_dir():
+            raise ValueError('已登记的 mylife Vault 不存在')
+        files = [p for p in root.rglob('*') if p.is_file() and not any(part.startswith('.') for part in p.relative_to(root).parts) and p.resolve().is_relative_to(root)]
+        relative_files = {str(p.relative_to(root)) for p in files}
+        pages = [p for p in files if p.suffix == '.md']
+        issues = []
+        for page in pages:
+            content = re.sub(r'(?ms)^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1[ \t]*$', '', page.read_text())
+            content = re.sub(r'(`+)[^\n]*?\1', '', content)
+            for ref in re.findall(r'\[\[([^\]]+)\]\]', content):
+                target = ref.split('|', 1)[0].split('#', 1)[0].strip()
+                if not target:
+                    continue
+                names = [target, target + '.md']
+                local = page.parent.relative_to(root)
+                matched = any(name in relative_files or str(local / name) in relative_files for name in names)
+                if not matched and '/' not in target:
+                    matched = any(p.name in names for p in files)
+                if not matched:
+                    issues.append({'path': str(page), 'type': 'broken-wikilink', 'target': target})
+        return {'domain': 'mylife', 'pages': len(pages), 'issues': issues, 'scope': 'mylife 本地双链与附件路径检查；不调用 LLM Wiki 或刷新索引，不检查标题锚点和观点真实性'}
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['domains', 'status', 'search', 'search-all', 'semantic', 'refresh', 'find', 'read', 'import', 'extract', 'write', 'embed', 'graph', 'reviews', 'check', 'mcp'])
+    parser.add_argument('action', choices=['domains', 'status', 'mylife', 'search', 'search-all', 'semantic', 'refresh', 'find', 'read', 'import', 'extract', 'write', 'embed', 'graph', 'reviews', 'check', 'mcp'])
     parser.add_argument('value', nargs='?')
     parser.add_argument('--domain', default='general')
     parser.add_argument('--file')
@@ -280,6 +332,8 @@ def main():
         result = flow.config
     elif args.action == 'status':
         result = flow.status()
+    elif args.action == 'mylife':
+        result = flow.mylife(args.value)
     elif args.action == 'search':
         result = flow.api('POST', '/search', {'query': args.value, 'topK': 8, 'includeContent': True})
     elif args.action in ['search-all', 'semantic']:
@@ -307,7 +361,7 @@ def main():
     elif args.action in ['graph', 'reviews']:
         result = flow.api('GET', '/' + args.action)
     elif args.action == 'check':
-        result = flow.check()
+        result = flow.check(args.domain)
     else:
         state = json.loads(Path(flow.config['appState']).read_text())
         os.environ['LLM_WIKI_API_TOKEN'] = state['apiConfig']['token']

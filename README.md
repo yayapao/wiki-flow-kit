@@ -35,9 +35,13 @@ $wiki-flow 恢复知识迁移包 <zip 路径>
 $wiki-flow 预览知识同步
 $wiki-flow 同步知识库
 $wiki-flow 每日同步知识库
+$wiki-flow mylife，这个项目值得留下，采访我
+$wiki-flow mylife，以旁观者视角看看我的这次选择
 ```
 
 The equivalent management commands are `wiki-flow init`, `doctor`, `bundle create`, `bundle restore`, `sync --dry-run`, `sync --apply`, `schedule enable`, `schedule disable`, and `update --check` / `update --apply`. The normal Wiki CLI remains available through the same `wiki-flow` command.
+
+An independent personal Obsidian vault can be registered as `personal.path` in `~/.config/wiki-flow/registry.json`. `wiki-flow mylife interview` and `wiki-flow mylife observe` load role instructions for the current conversation agent; local page operations use `--domain mylife`. This optional vault is separate from the LLM Wiki project, qmd sources, and the existing aiwiki/valut migration bundle.
 
 ## Portability Boundaries
 

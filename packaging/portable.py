@@ -875,6 +875,8 @@ def perform_sync(paths, apply):
                 result["qmdRefresh"] = "deferred: app rescan or ingestion is pending; rerun wiki-flow sync --apply after the app queue is idle"
             else:
                 cli = paths["data"] / "app" / "bin" / "wiki-flow"
+                if not cli.is_file():
+                    cli = paths["cli"]
                 try:
                     result["qmdRefresh"] = run([sys.executable, str(cli), "refresh", "--vectors"], timeout=1800) if cli.exists() else "pending: run wiki-flow refresh --vectors"
                     state["refreshPending"] = not cli.exists()
@@ -892,14 +894,15 @@ def create_launch_agent(paths):
     directory = app_home() / "Library" / "LaunchAgents"
     plist = directory / (label + ".plist")
     directory.mkdir(parents=True, exist_ok=True)
-    python_bin = resolve_runtime("python3", "python@3.12", 3)
+    # Keep launchd independent of shell-specific pyenv shims and PATH.
+    python_bin = str(Path(sys.executable).resolve())
     manager = paths["data"] / "portable.py"
     if not manager.is_file():
-        raise RuntimeError("Install wiki-flow-kit before enabling scheduled sync")
+        manager = Path(__file__).resolve()
     value = {
         "Label": label,
         "ProgramArguments": [python_bin, str(manager), "sync", "--apply"],
-        "StartCalendarInterval": {"Hour": 3, "Minute": 0},
+        "StartCalendarInterval": {"Hour": 10, "Minute": 0},
         "RunAtLoad": False,
         "EnvironmentVariables": {"WIKI_FLOW_CONFIG": str(paths["registry"])},
         "StandardOutPath": str(paths["data"] / "sync.log"),
@@ -909,7 +912,7 @@ def create_launch_agent(paths):
     uid = os.getuid()
     subprocess.run(["launchctl", "bootout", "gui/{}".format(uid), str(plist)], text=True, capture_output=True)
     run(["launchctl", "bootstrap", "gui/{}".format(uid), str(plist)], timeout=30)
-    print(json.dumps({"ok": True, "launchAgent": str(plist), "schedule": "daily at 03:00"}, ensure_ascii=False, indent=2))
+    print(json.dumps({"ok": True, "launchAgent": str(plist), "schedule": "daily at 10:00"}, ensure_ascii=False, indent=2))
     return 0
 
 
