@@ -820,6 +820,19 @@ def sync_command(args):
 
 
 def perform_sync(paths, apply):
+    # A linked aiwiki is read directly by the App. Never hash or copy the
+    # complete directory through the legacy snapshot synchronizer as well.
+    linked_config = paths["valut"] / ".llm-wiki" / "external-sources.json"
+    if linked_config.is_file():
+        mounts = json.loads(linked_config.read_text())
+        if any(item.get("name") == "aiwiki" and Path(item["directory"]).resolve() == paths["aiwiki"].resolve() for item in mounts):
+            result = {"dryRun": not apply, "mode": "external-source", "managedBy": "LLM Wiki App", "create": 0, "update": 0, "deleted": 0, "conflicts": []}
+            if apply and paths["registry"].is_file():
+                config = json.loads(paths["registry"].read_text())
+                if Path(config["general"]["path"]).resolve() == paths["valut"].resolve():
+                    result["appRescan"] = api_post(paths, config["general"]["id"], "sources/rescan")
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
     target, state_path, current, plan, stale, old_state = sync_plan(paths)
     if state_path.is_symlink() or (paths["valut"] / ".llm-wiki").is_symlink():
         raise RuntimeError("Refusing symbolic links in LLM Wiki sync metadata")

@@ -100,6 +100,22 @@ class PortableTests(unittest.TestCase):
                 portable.restore_bundle(type("Args", (), {"workspace": str(self.workspace), "bundle": str(bundle)})())
         self.assertFalse((self.home / "outside.txt").exists())
 
+    def test_linked_aiwiki_skips_legacy_full_scan_and_keeps_snapshots(self):
+        paths = self.paths()
+        portable.make_scaffold(paths)
+        target = paths["valut"] / "raw/sources/aiwiki/old.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("retained snapshot")
+        (paths["valut"] / ".llm-wiki/external-sources.json").write_text(json.dumps([
+            {"name": "aiwiki", "directory": str(paths["aiwiki"])}
+        ]))
+        with patch.object(portable, "sync_plan", side_effect=AssertionError("must not scan")):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(portable.perform_sync(paths, False), 0)
+            self.assertEqual(json.loads(output.getvalue())["mode"], "external-source")
+        self.assertEqual(target.read_text(), "retained snapshot")
+
     def test_sync_plan_detects_conflict_and_reports_removed_source_without_deleting(self):
         paths = self.paths()
         portable.make_scaffold(paths)
